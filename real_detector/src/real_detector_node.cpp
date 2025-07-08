@@ -18,39 +18,36 @@ public:
     rclcpp::QoS qos_profile = rclcpp::SensorDataQoS();
 
     sub_ = this->create_subscription<sensor_msgs::msg::PointCloud2>(
-        "/ZOE3/os_node/points", qos_profile,
+        "/prius/center_laser/scan", qos_profile,
         std::bind(&ConeDetectorNode::scanCallback, this, std::placeholders::_1));
   }
 
 private:
-  
-  void pointcloud_callback(const sensor_msgs::msg::PointCloud2::SharedPtr cloud_msg) {
-    // Convert to PCL PointCloud with intensity
-    pcl::PointCloud<pcl::PointXYZI>::Ptr cloud(new pcl::PointCloud<pcl::PointXYZI>());
+  void scanCallback(const sensor_msgs::msg::PointCloud2::SharedPtr cloud_msg) {
+    RCLCPP_INFO(this->get_logger(), "Received PointCloud2 message");
+
+    // Convert to PCL PointCloud
+    pcl::PointCloud<pcl::PointXYZ>::Ptr cloud(new pcl::PointCloud<pcl::PointXYZ>());
     pcl::fromROSMsg(*cloud_msg, *cloud);
 
-    // Create filtered cloud
-    pcl::PointCloud<pcl::PointXYZI>::Ptr filtered(new pcl::PointCloud<pcl::PointXYZI>());
-
-    const double angle_threshold_rad = 5.0 * M_PI / 180.0 / 2.0; 
-    const float intensity_threshold = 30.0; 
+    // Create new cloud for front sector
+    pcl::PointCloud<pcl::PointXYZ>::Ptr front_points(new pcl::PointCloud<pcl::PointXYZ>());
 
     for (const auto& point : cloud->points) {
       if (!std::isfinite(point.x) || !std::isfinite(point.y) || !std::isfinite(point.z)) {
         continue;
       }
 
-      double angle = std::atan2(point.y, point.x);
-      if (std::abs(angle) < angle_threshold_rad && point.intensity > intensity_threshold) {
-        filtered->points.push_back(point);
-        RCLCPP_INFO(this->get_logger(), "Filtered point: x=%.2f, y=%.2f, z=%.2f, I=%.2f",
-                    point.x, point.y, point.z, point.intensity);
+      double angle = std::atan2(point.y, point.x);  // [-π, π]
+      if (std::abs(angle) < 5.0 * M_PI / 180.0 / 2.0) {
+        front_points->points.push_back(point);
+        RCLCPP_INFO(this->get_logger(), "Front point: x=%.2f, y=%.2f, z=%.2f", point.x, point.y, point.z);
       }
     }
 
     // Convert back to ROS message and publish
     sensor_msgs::msg::PointCloud2 output;
-    pcl::toROSMsg(*filtered, output);
+    pcl::toROSMsg(*front_points, output);
     output.header = cloud_msg->header;
     pub_->publish(output);
   }
@@ -68,4 +65,3 @@ int main(int argc, char **argv)
   rclcpp::shutdown();
   return 0;
 }
-
