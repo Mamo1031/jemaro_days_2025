@@ -14,7 +14,11 @@ from rclpy.qos import QoSProfile, ReliabilityPolicy
 class PurePursuit(Node):
     def __init__(self):
         super().__init__('pure_pursuit')
-
+	
+	# TODO: Subscriber to obstacle detection
+	# Dummy obstacle definition
+        self.obstacles = np.array([[1.88666,6.957180],[1.7731,-0.0446746]])
+	
         # Subscriptions and Publishers
         self.path_sub = self.create_subscription(Path, '/path', self.path_callback, 10)
         qos_profile = QoSProfile(
@@ -69,12 +73,23 @@ class PurePursuit(Node):
         closest_id = np.argmin(dists)
 
         # Find the lookahead point
+        #TODO: definition of modified lookahead point
         lookahead_point = None
         for i in range(closest_id, len(self.path)):
             dist = np.linalg.norm(self.path[i] - position)
             if dist >= self.look_ahead_dist:
-                lookahead_point = self.path[i]
+                desired_lookahead_point = self.path[i]
                 break
+        dist_obs = np.zeros(len(self.obstacles))
+        for i in range(len(self.obstacles)):
+            dist_obs[i] = np.linalg.norm(self.obstacles[i] - position)
+            
+        if any(d_obs < 15 for d_obs in dist_obs): # 15 chosen as the security threshold to avoid obstacles
+            lookahead_point = desired_lookahead_point + np.array([-2,0])
+        else:
+       	    lookahead_point = desired_lookahead_point
+
+
 
         if lookahead_point is None:
             self.get_logger().warn('No lookahead point found.')
