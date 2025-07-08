@@ -17,7 +17,7 @@ class PurePursuit(Node):
 	
 	# TODO: Subscriber to obstacle detection
 	# Dummy obstacle definition
-        self.obstacles = np.array([[1.88666,6.957180],[1.7731,-0.0446746]])
+        self.obstacles = np.array([[-1.88666,6.957180],[-1.7731,-0.0446746]])
 	
         # Subscriptions and Publishers
         self.path_sub = self.create_subscription(Path, '/path', self.path_callback, 10)
@@ -41,6 +41,12 @@ class PurePursuit(Node):
         
         self.declare_parameter('look_ahead_dist', 2.5)
         self.look_ahead_dist = self.get_parameter('look_ahead_dist').get_parameter_value().double_value
+        
+        self.declare_parameter('avoidance_thresh', 10.0)
+        self.avoidance_thresh = self.get_parameter('avoidance_thresh').get_parameter_value().double_value
+        
+        self.declare_parameter('security_dist', -2.5)
+        self.security_dist = self.get_parameter('security_dist').get_parameter_value().double_value
         
         self.declare_parameter('kpp', 0.5)
         self.kpp = self.get_parameter('kpp').get_parameter_value().double_value
@@ -84,8 +90,8 @@ class PurePursuit(Node):
         for i in range(len(self.obstacles)):
             dist_obs[i] = np.linalg.norm(self.obstacles[i] - position)
             
-        if any(d_obs < 15 for d_obs in dist_obs): # 15 chosen as the security threshold to avoid obstacles
-            lookahead_point = desired_lookahead_point + np.array([-2,0])
+        if any(d_obs < self.avoidance_thresh for d_obs in dist_obs): # 10 chosen as the security threshold to avoid obstacles
+            lookahead_point = desired_lookahead_point + np.array([self.security_dist,0])
         else:
        	    lookahead_point = desired_lookahead_point
 
