@@ -25,6 +25,9 @@ public:
     pub_ = this->create_publisher<sensor_msgs::msg::PointCloud2>(
         "/filtered_points", 10);
 
+    ground_pub_ = this->create_publisher<sensor_msgs::msg::PointCloud2>(
+        "/ground_points", 10);
+
     // Subscriber to PointCloud2
     rclcpp::QoS qos_profile = rclcpp::SensorDataQoS();
     sub_ = this->create_subscription<sensor_msgs::msg::PointCloud2>(
@@ -70,6 +73,7 @@ private:
     // auto cloud_no_ground = removeGround(front_points, -1.7f);
     // Keep only points between z = -1.5 m and z = 1.0 m
     auto cloud_no_ground = removeGround(front_points, -1.6f, 0.5f);
+    auto ground_points   = removeGround(front_points, -1.6f, 0.10f);
 
 
 
@@ -159,7 +163,10 @@ private:
 
     pose_pub_->publish(pose_array);
 
-
+    sensor_msgs::msg::PointCloud2 ground_msg;
+    pcl::toROSMsg(*ground_points, ground_msg);
+    ground_msg.header = cloud_msg->header;
+    ground_pub_->publish(ground_msg);
 
 
     // Convert back to ROS message and publish
@@ -287,6 +294,7 @@ private:
   rclcpp::Publisher<geometry_msgs::msg::PoseArray>::SharedPtr pose_pub_;
   rclcpp::Subscription<sensor_msgs::msg::PointCloud2>::SharedPtr sub_;
   rclcpp::Publisher<sensor_msgs::msg::PointCloud2>::SharedPtr pub_;
+  rclcpp::Publisher<sensor_msgs::msg::PointCloud2>::SharedPtr ground_pub_;
   std::vector<rclcpp::Publisher<sensor_msgs::msg::PointCloud2>::SharedPtr> cluster_pubs_;
 
 };
@@ -299,3 +307,4 @@ int main(int argc, char **argv)
   rclcpp::shutdown();
   return 0;
 }
+
