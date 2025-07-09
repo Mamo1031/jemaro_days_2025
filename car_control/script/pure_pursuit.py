@@ -9,15 +9,16 @@ from nav_msgs.msg import Path, Odometry
 from geometry_msgs.msg import Twist
 #from prius_msgs.msg import Control
 from rclpy.qos import QoSProfile, ReliabilityPolicy
+from geometry_msgs.msg import PoseArray
 
 
 class PurePursuit(Node):
     def __init__(self):
         super().__init__('pure_pursuit')
 	
-	# TODO: Subscriber to obstacle detection
-	# Dummy obstacle definition
-        self.obstacles = np.array([[-1.88666,6.957180],[-1.7731,-0.0446746]])
+        self.cones = []  
+        self.obstacles = []
+        self.cone_clear_count = 0
 	
         # Subscriptions and Publishers
         self.path_sub = self.create_subscription(Path, '/path', self.path_callback, 10)
@@ -27,6 +28,7 @@ class PurePursuit(Node):
         )
         self.odom_sub = self.create_subscription(Odometry, '/odom', self.odom_callback, qos_profile)
         self.cmd_pub = self.create_publisher(Twist, '/cmd_vel', 10)
+        self.cone_sub = self.create_subscription(PoseArray, '/cone_poses', self.cone_callback, 10)
         #self.cmd_prius = self.create_publisher(Control, '/prius/control', 10)
 
         # Parameters and state
@@ -42,10 +44,10 @@ class PurePursuit(Node):
         self.declare_parameter('look_ahead_dist', 2.5)
         self.look_ahead_dist = self.get_parameter('look_ahead_dist').get_parameter_value().double_value
         
-        self.declare_parameter('avoidance_thresh', 10.0)
+        self.declare_parameter('avoidance_thresh', 12.5)
         self.avoidance_thresh = self.get_parameter('avoidance_thresh').get_parameter_value().double_value
         
-        self.declare_parameter('security_dist', -2.5)
+        self.declare_parameter('security_dist', -2.75)
         self.security_dist = self.get_parameter('security_dist').get_parameter_value().double_value
         
         self.declare_parameter('kpp', 0.5)
@@ -68,6 +70,32 @@ class PurePursuit(Node):
         self.yaw = np.arctan2(2.0 * (q.w * q.z + q.x * q.y), 1.0 - 2.0 * (q.y * q.y + q.z * q.z))
         self.speed = np.hypot(msg.twist.twist.linear.x, msg.twist.twist.linear.y)
 
+    def cone_callback(self, msg: PoseArray):
+        if self.pose is None:
+            return
+
+        theta = self.yaw - self.angle_offset
+        cos_t, sin_t = np.cos(theta), np.sin(theta)
+
+        px_map, py_map = self.pose.position.x, self.pose.position.y
+
+        for pose in msg.poses:
+            xr_left  = pose.position.x
+            yr_front = pose.position.y
+
+            x_front = yr_front           
+            y_left  = xr_left            
+
+            xw =  x_front * cos_t - y_left * sin_t + px_map   
+            yw =  x_front * sin_t + y_left * cos_t + py_map   
+
+            if any(np.hypot(xw - xo, yw - yo) < 1.0 for xo, yo in self.obstacles):
+                continue
+
+            if len(self.obstacles) == 0:
+                self.obstacles.append((xw, yw))
+                self.get_logger().info(f"ADD cone  -> ({xw:.2f}, {yw:.2f})")
+
     def control_loop(self):
         if self.path.size == 0 or self.pose is None:
             return
@@ -86,11 +114,26 @@ class PurePursuit(Node):
             if dist >= self.look_ahead_dist:
                 desired_lookahead_point = self.path[i]
                 break
-        dist_obs = np.zeros(len(self.obstacles))
-        for i in range(len(self.obstacles)):
-            dist_obs[i] = np.linalg.norm(self.obstacles[i] - position)
+
+        if self.obstacles:
+            obs_array = np.array(self.obstacles)
+            # dist_obs = np.linalg.norm(obs_array - position, axis=1)
+            rel_vectors = obs_array - position
+            heading_vector = np.array([np.cos(self.yaw - self.angle_offset), np.sin(self.yaw - self.angle_offset)])
+            forward_mask = np.dot(rel_vectors, heading_vector) > 0  # 前方にある障害物のみ
+            dist_obs = np.linalg.norm(rel_vectors, axis=1)
+            dist_obs = dist_obs[forward_mask] if np.any(forward_mask) else np.array([np.inf])
+        else:
+            dist_obs = np.array([np.inf])
             
-        if any(d_obs < self.avoidance_thresh for d_obs in dist_obs): # 10 chosen as the security threshold to avoid obstacles
+        in_danger = any(d_obs < self.avoidance_thresh for d_obs in dist_obs)
+
+        if (not in_danger) and len(self.obstacles) == 1:
+            self.cone_clear_count += 1
+            self.obstacles.clear()
+            self.get_logger().info(f"Cone #{self.cone_clear_count} cleared, waiting for next")
+
+        if in_danger:
             lookahead_point = desired_lookahead_point + np.array([self.security_dist,0])
         else:
        	    lookahead_point = desired_lookahead_point

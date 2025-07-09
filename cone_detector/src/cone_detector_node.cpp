@@ -60,7 +60,7 @@ private:
       }
 
       double angle = std::atan2(point.y, point.x);  // [-π, π]
-      if (std::abs(angle) < 10.0 * M_PI / 180.0 / 2.0) {
+      if (std::abs(angle) < 20.0 * M_PI / 180.0 / 2.0) {
         front_points->points.push_back(point);
         //RCLCPP_INFO(this->get_logger(), "Front point: x=%.2f, y=%.2f, z=%.2f", point.x, point.y, point.z);
       }
