@@ -6,7 +6,7 @@ import numpy as np
 import matplotlib.pyplot as plt
 
 from nav_msgs.msg import Path, Odometry
-from geometry_msgs.msg import Twist
+from geometry_msgs.msg import Twist, PoseStamped
 #from prius_msgs.msg import Control
 from rclpy.qos import QoSProfile, ReliabilityPolicy
 
@@ -28,7 +28,9 @@ class PurePursuit(Node):
         self.odom_sub = self.create_subscription(Odometry, '/odom', self.odom_callback, qos_profile)
         self.cmd_pub = self.create_publisher(Twist, '/cmd_vel', 10)
         #self.cmd_prius = self.create_publisher(Control, '/prius/control', 10)
-
+        
+        self.real_path_pub = self.create_publisher(Path, '/real_path', 10)
+        
         # Parameters and state
         self.timer = self.create_timer(0.1, self.control_loop)
         self.path = np.array([])
@@ -57,6 +59,9 @@ class PurePursuit(Node):
         self.declare_parameter('plot_path', False)
         self.plot_path = self.get_parameter('plot_path').get_parameter_value().bool_value
         self.real_path = []
+        
+        self.trajectory_msg = Path()
+        self.trajectory_msg.header.frame_id = "world"
 
     def path_callback(self, msg: Path):
         self.path = np.array([[pose.pose.position.x, pose.pose.position.y] for pose in msg.poses])
@@ -71,6 +76,17 @@ class PurePursuit(Node):
     def control_loop(self):
         if self.path.size == 0 or self.pose is None:
             return
+            
+        pose_stamped = PoseStamped()
+        pose_stamped.header.stamp = self.get_clock().now().to_msg()
+        pose_stamped.header.frame_id = "world"
+        pose_stamped.pose = self.pose
+        self.trajectory_msg.header.stamp = self.get_clock().now().to_msg()
+        self.trajectory_msg.poses.append(pose_stamped)
+        self.real_path_pub.publish(self.trajectory_msg)
+        self.get_logger().info('Publishing real_path with {} poses'.format(len(self.trajectory_msg.poses))) ## magic line
+
+            
         if self.plot_path :
             self.real_path.append([self.pose.position.x, self.pose.position.y])
         position = np.array([self.pose.position.x, self.pose.position.y])
@@ -117,7 +133,8 @@ class PurePursuit(Node):
                 plt.show(block=False)
                 plt.pause(0.001)
                 self.plot_path = False
-            return
+                return
+            
 
 
         path_pos = self.path[closest_id]
