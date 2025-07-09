@@ -60,5 +60,67 @@ ros2 launch pointcloud_downsampling pointcloud_downsampling.launch.py
 ```
 
 
+# Cone Detector Node (3bag_cone_detector)
+
+This node detects traffic cones from 3D LiDAR point cloud data using clustering and rule-based scoring.
+
+---
+
+## 🔧 Inputs
+
+- `/ZOE3/os_node/points_downsampled`  
+  (Type: `sensor_msgs/msg/PointCloud2`)  
+  → Downsampled LiDAR point cloud
+
+---
+
+## 📤 Outputs
+
+- `/filtered_points`  
+  Point cloud after removing ground and region cropping
+
+- `/No1_cluster`, `/No2_cluster`, ..., `/No5_cluster`  
+  Top 5 clusters with highest cone-likeness scores
+
+- `/confirmed_cone_cluster`  
+  Cluster that is confirmed to be a cone (score > threshold)
+
+- `/cone_poses`  
+  `PoseArray` with the cone's 3D position (only published once)
+
+---
+
+## 🧠 How Cone Detection Works
+
+1. **Crop Region**  
+   Only keep points in the right-front area of the car.
+
+2. **Ground Removal**  
+   Remove points outside a height range (`z ∈ [-1.1, 0.5]`).
+
+3. **Clustering**  
+   Use Euclidean clustering to extract object candidates.
+
+4. **Scoring Clusters**  
+   For each cluster:
+   - Calculate average intensity
+   - Compute a score using:
+     ```
+     score = exp(- (intensity - 150)^2 / 2000)
+     ```
+
+5. **Cone Decision**
+   - Keep clusters with score > 0.7
+   - Publish the highest-scoring cluster as the detected cone
+   - Also publish its 3D position (`/cone_poses`) only on first detection
+
+---
+
+## ✅ Notes
+
+- The node uses hardcoded region and intensity thresholds for simplicity.
+- Designed for use with high-reflection cones and real-time applications.
+- Visualization can be done in Rviz via the published topics.
+
 
 
