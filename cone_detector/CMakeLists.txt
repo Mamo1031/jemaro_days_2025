@@ -16,6 +16,9 @@ find_package(geometry_msgs REQUIRED)
 
 
 add_executable(cone_detector_node src/cone_detector_node.cpp)
+add_executable(bag_cone_detector_node src/bag_cone_detector_node.cpp)
+add_executable(2bag_cone_detector_node src/2bag_cone_detector_node.cpp)
+add_executable(3bag_cone_detector_node src/3bag_cone_detector_node.cpp)
 
 ament_target_dependencies(cone_detector_node
   rclcpp
@@ -26,8 +29,38 @@ ament_target_dependencies(cone_detector_node
   geometry_msgs
 )
 
+ament_target_dependencies(bag_cone_detector_node
+  rclcpp
+  sensor_msgs
+  laser_geometry
+  pcl_conversions
+  pcl_ros
+  geometry_msgs
+)
+
+ament_target_dependencies(2bag_cone_detector_node
+  rclcpp
+  sensor_msgs
+  laser_geometry
+  pcl_conversions
+  pcl_ros
+  geometry_msgs
+)
+
+ament_target_dependencies(3bag_cone_detector_node
+  rclcpp
+  sensor_msgs
+  laser_geometry
+  pcl_conversions
+  pcl_ros
+  geometry_msgs
+)
+
 install(TARGETS
   cone_detector_node
+  bag_cone_detector_node
+  2bag_cone_detector_node
+  3bag_cone_detector_node
   DESTINATION lib/${PROJECT_NAME}
 )
 
