@@ -1,0 +1,28 @@
+{
+    "python.autoComplete.extraPaths": [
+        "/home/ecn/ros2/build/status_pkg",
+        "/home/ecn/ros2/install/status_pkg/lib/python3.8/site-packages",
+        "/home/ecn/ros2/build/range_pkg",
+        "/home/ecn/ros2/install/range_pkg/lib/python3.8/site-packages",
+        "/opt/ecn/ros2/install/simple_launch/lib/python3.8/site-packages",
+        "/opt/ecn/ros2/install/map_simulator/lib/python3.8/site-packages",
+        "/opt/ecn/ros2/install/baxter_simple_sim/lib/python3.8/site-packages",
+        "/opt/ecn/ros2/install/baxter_maintenance_msgs/lib/python3.8/site-packages",
+        "/opt/ecn/ros2/install/baxter_core_msgs/lib/python3.8/site-packages",
+        "/opt/ros/galactic/lib/python3.8/site-packages",
+        ""
+    ],
+    "python.analysis.extraPaths": [
+        "/home/ecn/ros2/build/status_pkg",
+        "/home/ecn/ros2/install/status_pkg/lib/python3.8/site-packages",
+        "/home/ecn/ros2/build/range_pkg",
+        "/home/ecn/ros2/install/range_pkg/lib/python3.8/site-packages",
+        "/opt/ecn/ros2/install/simple_launch/lib/python3.8/site-packages",
+        "/opt/ecn/ros2/install/map_simulator/lib/python3.8/site-packages",
+        "/opt/ecn/ros2/install/baxter_simple_sim/lib/python3.8/site-packages",
+        "/opt/ecn/ros2/install/baxter_maintenance_msgs/lib/python3.8/site-packages",
+        "/opt/ecn/ros2/install/baxter_core_msgs/lib/python3.8/site-packages",
+        "/opt/ros/galactic/lib/python3.8/site-packages",
+        ""
+    ]
+}

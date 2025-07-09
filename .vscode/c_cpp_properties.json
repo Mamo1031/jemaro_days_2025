@@ -1,0 +1,28 @@
+{
+  "configurations": [
+    {
+      "browse": {
+        "databaseFilename": "${default}",
+        "limitSymbolsToIncludedHeaders": false
+      },
+      "includePath": [
+        "/home/ecn/ros2/install/ecn_manip/include/**",
+        "/opt/ecn/ros2/install/map_simulator/include/**",
+        "/opt/ecn/ros2/install/baxter_simple_sim/include/**",
+        "/opt/ecn/ros2/install/baxter_maintenance_msgs/include/**",
+        "/opt/ecn/ros2/install/baxter_core_msgs/include/**",
+        "/opt/ros/galactic/include/**",
+        "/home/ecn/ros2/src/converter_pubsub/include/**",
+        "/home/ecn/ros2/src/ecn_manip/include/**",
+        "/home/ecn/ros2/src/jemaro_days_2025/pointcloud_downsampling/include/**",
+        "/usr/include/**"
+      ],
+      "name": "ROS",
+      "intelliSenseMode": "gcc-x64",
+      "compilerPath": "/usr/bin/gcc",
+      "cStandard": "gnu11",
+      "cppStandard": "c++14"
+    }
+  ],
+  "version": 4
+}
