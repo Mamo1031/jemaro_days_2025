@@ -1,5 +1,5 @@
 cmake_minimum_required(VERSION 3.8)
-project(cone_detector)
+project(cone_real)
 
 if(CMAKE_COMPILER_IS_GNUCXX OR CMAKE_CXX_COMPILER_ID MATCHES "Clang")
   add_compile_options(-Wall -Wextra -Wpedantic)
@@ -13,7 +13,6 @@ find_package(laser_geometry REQUIRED)
 find_package(pcl_conversions REQUIRED)
 find_package(pcl_ros REQUIRED)
 find_package(geometry_msgs REQUIRED)
-
 
 add_executable(cone_detector_node src/cone_detector_node.cpp)
 

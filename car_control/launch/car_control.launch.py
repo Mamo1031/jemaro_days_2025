@@ -14,7 +14,9 @@ def generate_launch_description():
                 'angle_offset': 1.5707963,
                 'plot_path': False}],
             remappings=[
-                ('/odom', '/prius/ground_truth')
+                ('/odom', '/ZOE3/position/map_ekf_odometry'),
+                ('/real_path', '/ZOE3/path_follower/setPath'),
+                ('/path', '/ZOE3/path_follower/PassPointsPath')
             ]
         ),
     ])
