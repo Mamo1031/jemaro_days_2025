@@ -21,6 +21,8 @@ public:
       : Node("cone_detector_node") {
 
     rclcpp::QoS qos_profile = rclcpp::SensorDataQoS();
+    rclcpp::QoS qos_profile_pub(10);
+    qos_profile_pub.reliable();
 
     // sub lidar downsampling
     sub_ = this->create_subscription<sensor_msgs::msg::PointCloud2>(
@@ -43,7 +45,7 @@ public:
     "/confirmed_cone_cluster", 10);
 
     // publish final cone poses
-    pose_pub_ = this->create_publisher<geometry_msgs::msg::Pose>("/cone_pose", 10);
+    pose_pub_ = this->create_publisher<geometry_msgs::msg::Pose>("/cluster_intensity", qos_profile_pub);
 
 }
 
