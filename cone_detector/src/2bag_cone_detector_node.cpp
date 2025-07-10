@@ -52,8 +52,8 @@ public:
     cluster_pubs_.push_back(pub);
     }
 
-    // // publish final cone poses
-    // pose_pub_ = this->create_publisher<geometry_msgs::msg::PoseArray>("/cone_poses", 10);
+    // publish final cone poses
+    pose_pub_ = this->create_publisher<geometry_msgs::msg::Pose>("/cone_pose", 10);
 
     //publish confirmation of cone
     confirmed_cone_pub_ = this->create_publisher<sensor_msgs::msg::PointCloud2>(
@@ -142,31 +142,28 @@ private:
       float max_z = std::get<2>(top_cones[0]);
 
       if (cone_idx >= 0 && cone_idx < static_cast<int>(clusters.size()) && max_z >= 0.1f) {
+      
+        // int cone_idx = top_cones[0].first;
+        if (cone_idx < clusters.size()) {
+          Eigen::Vector4f centroid;
+          pcl::compute3DCentroid(*clusters[cone_idx], centroid);
 
-        geometry_msgs::msg::PoseArray pose_array;
-        pose_array.header = cloud_msg->header;
+          geometry_msgs::msg::Pose pose;
+          pose.position.x = centroid[0];
+          pose.position.y = centroid[1];
+          pose.position.z = centroid[2];
+          pose.orientation.w = 1.0;
 
-        geometry_msgs::msg::Pose pose;
-        Eigen::Vector4f centroid;
-        pcl::compute3DCentroid(*clusters[cone_idx], centroid);
-        pose.position.x = centroid[0];
-        pose.position.y = centroid[1];
-        pose.position.z = centroid[2];
-        pose.orientation.w = 1.0;
-        RCLCPP_INFO(this->get_logger(), "Published cone Pose");
+          RCLCPP_INFO(this->get_logger(), "Published cone Pose");
+          pose_pub_->publish(pose);
 
-        pose_array.poses.push_back(pose);
-        pose_pub_->publish(pose_array);
-
-        detected_once_ = true;
-        RCLCPP_INFO(this->get_logger(), "detected_once = true");
-      } else {
-        RCLCPP_WARN(this->get_logger(), "Invalid cone index or max_z too low.");
+          detected_once_ = true;
+          RCLCPP_INFO(this->get_logger(), "detected_once = true");
+        } else {
+          RCLCPP_WARN(this->get_logger(), "Invalid cone index.");
+        }
       }
     }
-
-
-
   }
 
   // Remove ground and high points AND keep only right-side points (y < 0)
@@ -300,7 +297,7 @@ private:
 
   }
 
-  rclcpp::Publisher<geometry_msgs::msg::PoseArray>::SharedPtr pose_pub_;
+  rclcpp::Publisher<geometry_msgs::msg::Pose>::SharedPtr pose_pub_;
   rclcpp::Subscription<sensor_msgs::msg::PointCloud2>::SharedPtr sub_;
   rclcpp::Publisher<sensor_msgs::msg::PointCloud2>::SharedPtr pub_;
   std::vector<rclcpp::Publisher<sensor_msgs::msg::PointCloud2>::SharedPtr> cluster_pubs_;

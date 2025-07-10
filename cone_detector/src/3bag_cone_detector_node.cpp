@@ -43,7 +43,7 @@ public:
     "/confirmed_cone_cluster", 10);
 
     // publish final cone poses
-    pose_pub_ = this->create_publisher<geometry_msgs::msg::PoseArray>("/cone_poses", 10);
+    pose_pub_ = this->create_publisher<geometry_msgs::msg::Pose>("/cone_pose", 10);
 
 }
 
@@ -122,23 +122,43 @@ private:
 
     if (!detected_once_  && !top_cones.empty() && top_cones[0].second >= 0.7f) {
 
-      geometry_msgs::msg::PoseArray pose_array;
-      pose_array.header = cloud_msg->header;
+      int cone_idx = top_cones[0].first;
+      if (cone_idx < clusters.size()) {
+        Eigen::Vector4f centroid;
+        pcl::compute3DCentroid(*clusters[cone_idx], centroid);
 
-      geometry_msgs::msg::Pose pose;
-      Eigen::Vector4f centroid;
-      pcl::compute3DCentroid(*clusters[top_cones[0].first], centroid);
-      pose.position.x = centroid[0];
-      pose.position.y = centroid[1];
-      pose.position.z = centroid[2];
-      pose.orientation.w = 1.0;
-      RCLCPP_INFO(this->get_logger(), "Published cone Pose");
+        geometry_msgs::msg::Pose pose;
+        pose.position.x = centroid[0];
+        pose.position.y = centroid[1];
+        pose.position.z = centroid[2];
+        pose.orientation.w = 1.0;
 
-      pose_array.poses.push_back(pose);
-      pose_pub_->publish(pose_array);
+        RCLCPP_INFO(this->get_logger(), "Published cone Pose");
+        pose_pub_->publish(pose);
 
-      detected_once_ = true;
-      RCLCPP_INFO(this->get_logger(), "detected_once = true");
+        detected_once_ = true;
+        RCLCPP_INFO(this->get_logger(), "detected_once = true");
+      } else {
+        RCLCPP_WARN(this->get_logger(), "Invalid cone index.");
+      }
+
+      // geometry_msgs::msg::Pose pose;
+      // pose.header = cloud_msg->header;
+
+      // geometry_msgs::msg::Pose pose;
+      // Eigen::Vector4f centroid;
+      // pcl::compute3DCentroid(*clusters[top_cones[0].first], centroid);
+      // pose.position.x = centroid[0];
+      // pose.position.y = centroid[1];
+      // pose.position.z = centroid[2];
+      // pose.orientation.w = 1.0;
+      // RCLCPP_INFO(this->get_logger(), "Published cone Pose");
+
+      // pose.poses.push_back(pose);
+      // pose_pub_->publish(pose);
+
+      // detected_once_ = true;
+      // RCLCPP_INFO(this->get_logger(), "detected_once = true");
     }
 
   }
@@ -273,7 +293,7 @@ private:
     return scores;
   }
 
-  rclcpp::Publisher<geometry_msgs::msg::PoseArray>::SharedPtr pose_pub_;
+  rclcpp::Publisher<geometry_msgs::msg::Pose>::SharedPtr pose_pub_;
   rclcpp::Subscription<sensor_msgs::msg::PointCloud2>::SharedPtr sub_;
   rclcpp::Publisher<sensor_msgs::msg::PointCloud2>::SharedPtr pub_;
   std::vector<rclcpp::Publisher<sensor_msgs::msg::PointCloud2>::SharedPtr> cluster_pubs_;
