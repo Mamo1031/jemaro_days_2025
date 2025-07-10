@@ -21,17 +21,17 @@ class PurePursuit(Node):
         self.cone_clear_count = 0
 	
         # Subscriptions and Publishers
-        self.path_sub = self.create_subscription(Path, '/path', self.path_callback, 10)
         qos_profile = QoSProfile(
-            reliability=ReliabilityPolicy.RELIABLE,
+            reliability=ReliabilityPolicy.BEST_EFFORT,
             depth=10
         )
+        self.path_sub = self.create_subscription(Path, '/path', self.path_callback, qos_profile)
         self.odom_sub = self.create_subscription(Odometry, '/odom', self.odom_callback, qos_profile)
-        self.cmd_pub = self.create_publisher(Twist, '/cmd_vel', 10)
+        self.cmd_pub = self.create_publisher(Twist, '/cmd_vel', qos_profile)
         self.cone_sub = self.create_subscription(Pose, '/cone_pose_intensity', self.cone_callback, qos_profile)
         #self.cmd_prius = self.create_publisher(Control, '/prius/control', 10)
         
-        self.real_path_pub = self.create_publisher(Path, '/real_path', 10)
+        self.real_path_pub = self.create_publisher(Path, '/real_path', qos_profile)
         
         # Parameters and state
         self.timer = self.create_timer(0.1, self.control_loop)
