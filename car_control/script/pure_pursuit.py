@@ -9,7 +9,7 @@ from nav_msgs.msg import Path, Odometry
 from geometry_msgs.msg import Twist, PoseStamped
 #from prius_msgs.msg import Control
 from rclpy.qos import QoSProfile, ReliabilityPolicy
-from geometry_msgs.msg import PoseArray
+from geometry_msgs.msg import Pose
 
 
 class PurePursuit(Node):
@@ -23,12 +23,12 @@ class PurePursuit(Node):
         # Subscriptions and Publishers
         self.path_sub = self.create_subscription(Path, '/path', self.path_callback, 10)
         qos_profile = QoSProfile(
-            reliability=ReliabilityPolicy.BEST_EFFORT,
+            reliability=ReliabilityPolicy.RELIABLE,
             depth=10
         )
         self.odom_sub = self.create_subscription(Odometry, '/odom', self.odom_callback, qos_profile)
         self.cmd_pub = self.create_publisher(Twist, '/cmd_vel', 10)
-        self.cone_sub = self.create_subscription(PoseArray, '/cone_poses', self.cone_callback, 10)
+        self.cone_sub = self.create_subscription(Pose, '/cone_pose_intensity', self.cone_callback, qos_profile)
         #self.cmd_prius = self.create_publisher(Control, '/prius/control', 10)
         
         self.real_path_pub = self.create_publisher(Path, '/real_path', 10)
@@ -75,31 +75,56 @@ class PurePursuit(Node):
         self.yaw = np.arctan2(2.0 * (q.w * q.z + q.x * q.y), 1.0 - 2.0 * (q.y * q.y + q.z * q.z))
         self.speed = np.hypot(msg.twist.twist.linear.x, msg.twist.twist.linear.y)
 
-    def cone_callback(self, msg: PoseArray):
+    # def cone_callback(self, msg: PoseArray):
+    #     if self.pose is None:
+    #         return
+
+    #     theta = self.yaw - self.angle_offset
+    #     cos_t, sin_t = np.cos(theta), np.sin(theta)
+
+    #     px_map, py_map = self.pose.position.x, self.pose.position.y
+
+    #     for pose in msg.poses:
+    #         xr_left  = pose.position.x
+    #         yr_front = pose.position.y
+
+    #         x_front = yr_front           
+    #         y_left  = xr_left            
+
+    #         xw =  x_front * cos_t - y_left * sin_t + px_map   
+    #         yw =  x_front * sin_t + y_left * cos_t + py_map   
+
+    #         if any(np.hypot(xw - xo, yw - yo) < 1.0 for xo, yo in self.obstacles):
+    #             continue
+
+    #         if len(self.obstacles) == 0:
+    #             self.obstacles.append((xw, yw))
+    #             self.get_logger().info(f"ADD cone  -> ({xw:.2f}, {yw:.2f})")
+
+    def cone_callback(self, pose: Pose):
+        """コーン 1 個（Pose 型）を受信し，マップ座標に変換して登録"""
         if self.pose is None:
             return
 
+        # 車両ヨー角（地図座標系→車両座標系）
         theta = self.yaw - self.angle_offset
         cos_t, sin_t = np.cos(theta), np.sin(theta)
 
+        # LiDAR 座標系（x=左, y=前）
+        x_front = pose.position.y   # 前方
+        y_left  = pose.position.x   # 左
+
+        # 車両→マップ座標変換
         px_map, py_map = self.pose.position.x, self.pose.position.y
+        xw = x_front * cos_t - y_left * sin_t + px_map
+        yw = x_front * sin_t + y_left * cos_t + py_map
 
-        for pose in msg.poses:
-            xr_left  = pose.position.x
-            yr_front = pose.position.y
+        # 既登録との重複を除外
+        if any(np.hypot(xw - xo, yw - yo) < 1.0 for xo, yo in self.obstacles):
+            return
 
-            x_front = yr_front           
-            y_left  = xr_left            
-
-            xw =  x_front * cos_t - y_left * sin_t + px_map   
-            yw =  x_front * sin_t + y_left * cos_t + py_map   
-
-            if any(np.hypot(xw - xo, yw - yo) < 1.0 for xo, yo in self.obstacles):
-                continue
-
-            if len(self.obstacles) == 0:
-                self.obstacles.append((xw, yw))
-                self.get_logger().info(f"ADD cone  -> ({xw:.2f}, {yw:.2f})")
+        self.obstacles.append((xw, yw))
+        self.get_logger().info(f"ADD cone  -> ({xw:.2f}, {yw:.2f})")
 
     def control_loop(self):
         if self.path.size == 0 or self.pose is None:
