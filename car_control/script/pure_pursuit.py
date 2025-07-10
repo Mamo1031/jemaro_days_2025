@@ -102,24 +102,26 @@ class PurePursuit(Node):
     #             self.get_logger().info(f"ADD cone  -> ({xw:.2f}, {yw:.2f})")
 
     def cone_callback(self, pose: Pose):
-        """コーン 1 個（Pose 型）を受信し，マップ座標に変換して登録"""
-        if self.pose is None:
-            return
+        if self.path.size == 0 or self.pose is None:
+            self.get_logger().warn("Missing path or pose. Using fallback.")
+            if self.path.size == 0:
+                self.path = np.array([[0.0, 0.0], [5.0, 0.0]])
+            if self.pose is None:
+                self.pose = Pose()
+                self.pose.position.x = 0.0
+                self.pose.position.y = 0.0
+                self.pose.orientation.w = 1.0
 
-        # 車両ヨー角（地図座標系→車両座標系）
         theta = self.yaw - self.angle_offset
         cos_t, sin_t = np.cos(theta), np.sin(theta)
 
-        # LiDAR 座標系（x=左, y=前）
-        x_front = pose.position.y   # 前方
-        y_left  = pose.position.x   # 左
+        x_front = pose.position.y 
+        y_left  = pose.position.x  
 
-        # 車両→マップ座標変換
         px_map, py_map = self.pose.position.x, self.pose.position.y
         xw = x_front * cos_t - y_left * sin_t + px_map
         yw = x_front * sin_t + y_left * cos_t + py_map
 
-        # 既登録との重複を除外
         if any(np.hypot(xw - xo, yw - yo) < 1.0 for xo, yo in self.obstacles):
             return
 
@@ -148,7 +150,6 @@ class PurePursuit(Node):
         closest_id = np.argmin(dists)
 
         # Find the lookahead point
-        #TODO: definition of modified lookahead point
         lookahead_point = None
         for i in range(closest_id, len(self.path)):
             dist = np.linalg.norm(self.path[i] - position)
@@ -164,8 +165,11 @@ class PurePursuit(Node):
             forward_mask = np.dot(rel_vectors, heading_vector) > 0  # 前方にある障害物のみ
             dist_obs = np.linalg.norm(rel_vectors, axis=1)
             dist_obs = dist_obs[forward_mask] if np.any(forward_mask) else np.array([np.inf])
+            
+            # self.get_logger().info(f"DEBUG: dist_obs values: {dist_obs}")
         else:
             dist_obs = np.array([np.inf])
+            # self.get_logger().info(f"DEBUG: No obstacles, dist_obs: {dist_obs}")
             
         in_danger = any(d_obs < self.avoidance_thresh for d_obs in dist_obs)
 
