@@ -123,4 +123,51 @@ This node detects traffic cones from 3D LiDAR point cloud data using clustering 
 - Visualization can be done in Rviz via the published topics.
 
 
+# 🟠 Cone Detector Node (3bag_cone_detector)
+
+This ROS 2 node detects traffic cones using LiDAR point clouds. It clusters points, scores each cluster based on intensity and shape, and identifies cones based on vertical height.
+
+## ✅ What’s New
+- **Expanded Search Area**: Looks further and wider in front of the vehicle.
+- **Height-Based Detection**: Uses max Z height (e.g., > 0.1 m) to confirm cones.
+- **One-Time Pose Publishing**: Publishes cone position only once after detection.
+
+---
+
+## 📥 Input
+- `/ZOE3/os_node/points_downsampled`  
+  `sensor_msgs/msg/PointCloud2`  
+  → Downsampled LiDAR data.
+
+---
+
+## 📤 Output
+- `/filtered_points`: PointCloud2 (after ground removal)
+- `/No1_cluster` ~ `/No5_cluster`: Top 5 clusters
+- `/confirmed_cone_cluster`: Final confirmed cone cluster
+- `/cone_poses`: `geometry_msgs/msg/PoseArray` — Position of detected cone
+
+---
+
+## 🔍 Detection Method
+
+1. **Preprocessing**  
+   - Keep points in a rectangular region in front of the vehicle  
+   - Remove ground points (based on z range) and left-side points
+
+2. **Clustering**  
+   - Euclidean clustering to separate objects
+
+3. **Scoring Clusters**  
+   - Score based on:
+     - **Intensity**
+     - **Height**, **Width**, **Depth**
+   - Only clusters with `max_z > 0.1` are considered cones
+
+4. **Publishing**  
+   - Top 5 clusters visualized  
+   - The **first confirmed cone pose** is published once
+
+---
+
 
