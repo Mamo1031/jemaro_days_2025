@@ -103,14 +103,7 @@ class PurePursuit(Node):
 
     def cone_callback(self, pose: Pose):
         if self.path.size == 0 or self.pose is None:
-            self.get_logger().warn("Missing path or pose. Using fallback.")
-            if self.path.size == 0:
-                self.path = np.array([[0.0, 0.0], [5.0, 0.0]])
-            if self.pose is None:
-                self.pose = Pose()
-                self.pose.position.x = 0.0
-                self.pose.position.y = 0.0
-                self.pose.orientation.w = 1.0
+            return
 
         theta = self.yaw - self.angle_offset
         cos_t, sin_t = np.cos(theta), np.sin(theta)
