@@ -21,7 +21,7 @@ public:
       : Node("cone_detector_node") {
 
     rclcpp::QoS qos_profile = rclcpp::SensorDataQoS();
-    
+
     // sub lidar downsampling
     sub_ = this->create_subscription<sensor_msgs::msg::PointCloud2>(
       "/ZOE3/os_node/points_downsampled", qos_profile,
@@ -251,6 +251,14 @@ private:
 
       if (total_score > 0.7f) {
         std::cout << "\033[1;31m[DETECTED] Cone detected! Score = " << total_score << "\033[0m" << std::endl;
+        std::cout << "Cluster " << i
+                  << " | Intensity=" << avg_intensity
+                  << " | height=" << height << ", width=" << width << ", depth=" << depth << std::endl;
+
+        std::cout << " → Scores: intensity=" << intensity_score
+                  << ", height=" << height_score
+                  << ", width=" << width_score
+                  << ", depth=" << depth_score << std::endl;
       }
 
       scores.emplace_back(i, total_score);

@@ -23,11 +23,6 @@ public:
       : Node("cone_detector_node") {
 
     rclcpp::QoS qos_profile = rclcpp::SensorDataQoS();
-
-    // Sub PointCloud2 simulation
-    // sub_ = this->create_subscription<sensor_msgs::msg::PointCloud2>(
-    //     "/prius/center_laser/scan", qos_profile,
-    //     std::bind(&ConeDetectorNode::scanCallback, this, std::placeholders::_1));
     
     // sub lidar dataset
     // sub_ = this->create_subscription<sensor_msgs::msg::PointCloud2>(
@@ -69,14 +64,11 @@ public:
 
 private:
   int high_score_count_ = 0;
+  bool detected_once_ = false;
   void scanCallback(const sensor_msgs::msg::PointCloud2::SharedPtr cloud_msg) {
-    //RCLCPP_INFO(this->get_logger(), "Received PointCloud2 message");
 
     // Convert to PCL PointCloud with intensity
     pcl::PointCloud<pcl::PointXYZI>::Ptr cloud(new pcl::PointCloud<pcl::PointXYZI>());
-    // Convert to PCL PointCloud without intensity
-    // pcl::PointCloud<pcl::PointXYZ>::Ptr cloud(new pcl::PointCloud<pcl::PointXYZ>());
-
     pcl::fromROSMsg(*cloud_msg, *cloud);
 
 
@@ -86,14 +78,13 @@ private:
       if (!std::isfinite(point.x) || !std::isfinite(point.y) || !std::isfinite(point.z)) {
         continue;
       }
-
       // Rectangular box in front of the car (in base_link frame)
       // x is in front of car, y is left way of car. 
       // You can tune these numbers:
       float x_min = 0.0; //back 0
-      float x_max = 100.0; //front 100
+      float x_max = 50.0; //front 100
       float y_min = -2.2; //right -2.2
-      float y_max = 3.2;  //left 3.2
+      float y_max = 1;  //left 3.2
       if (point.x >= x_min && point.x <= x_max &&
       point.y >= y_min && point.y <= y_max) {
         front_points->points.push_back(point);
@@ -134,13 +125,11 @@ private:
       cluster_pubs_[i]->publish(msg);
     }
 
-    // RCLCPP_INFO(this->get_logger(), "Published %lu clusters", std::min(clusters.size(), cluster_pubs_.size()));
-
 
     // Step 4: choose cone cluster
     auto top_cones = getTop5ConeCandidates(clusters);
-    for (const auto& [idx, score] : top_cones) {
-      if (score < 0.8f) continue;  // スコアが低いものは publish しない
+    for (const auto& [idx, score, max_z] : top_cones) {
+      if (max_z > 0.1f) continue;  // スコアが低いものは publish しない
 
       sensor_msgs::msg::PointCloud2 msg;
       pcl::toROSMsg(*clusters[idx], msg);
@@ -148,88 +137,37 @@ private:
       confirmed_cone_pub_->publish(msg);
     }
 
+    if (!detected_once_ && !top_cones.empty()) {
+      int cone_idx = std::get<0>(top_cones[0]);
+      float max_z = std::get<2>(top_cones[0]);
 
-    
+      if (cone_idx >= 0 && cone_idx < static_cast<int>(clusters.size()) && max_z >= 0.1f) {
 
-    // // Step 5: From top 5, select 2 closest to the car
-    // std::vector<std::tuple<int, float, float>> scored_clusters;  // (cluster index, score, distance)
+        geometry_msgs::msg::PoseArray pose_array;
+        pose_array.header = cloud_msg->header;
 
-    // for (const auto& [idx, score] : top_cones) {
-    //   Eigen::Vector4f centroid;
-    //   if (idx < 0 || idx >= static_cast<int>(clusters.size())) {
-    //     // RCLCPP_WARN(this->get_logger(), "clusters index %d is out of range. (number of cluseters: %lu)", idx, clusters.size());
-    //     // continue;
-    //   }
-    //   pcl::compute3DCentroid(*clusters[idx], centroid);
-    //   float dist = std::sqrt(centroid[0] * centroid[0] + centroid[1] * centroid[1]);
-    //   scored_clusters.emplace_back(idx, score, dist);
-    // }
+        geometry_msgs::msg::Pose pose;
+        Eigen::Vector4f centroid;
+        pcl::compute3DCentroid(*clusters[cone_idx], centroid);
+        pose.position.x = centroid[0];
+        pose.position.y = centroid[1];
+        pose.position.z = centroid[2];
+        pose.orientation.w = 1.0;
+        RCLCPP_INFO(this->get_logger(), "Published cone Pose");
 
-    // // Sort by distance (ascending)
-    // std::sort(scored_clusters.begin(), scored_clusters.end(),
-    //           [](const auto& a, const auto& b) {
-    //             return std::get<2>(a) < std::get<2>(b);  // Compare by distance
-    //           });
+        pose_array.poses.push_back(pose);
+        pose_pub_->publish(pose_array);
 
-    // // Retain only the closest 2 clusters
-    // if (scored_clusters.size() > 2) scored_clusters.resize(2);
-
-    // // publish top 2
-    // for (size_t i = 0; i < scored_clusters.size(); ++i) {
-    //   int idx = std::get<0>(scored_clusters[i]);
-    //   float score = std::get<1>(scored_clusters[i]);
-    //   float dist = std::get<2>(scored_clusters[i]);
-
-    //   // RCLCPP_INFO(this->get_logger(), "CLOSEST CONE: Cluster %d | score=%.3f | dist=%.2f m", idx, score, dist);
-
-    //   sensor_msgs::msg::PointCloud2 msg;
-    //   pcl::toROSMsg(*clusters[idx], msg);
-    //   msg.header = cloud_msg->header;
-    //   cluster_pubs_[i]->publish(msg);  // Overwrite pubs 0 and 1
-    // }
+        detected_once_ = true;
+        RCLCPP_INFO(this->get_logger(), "detected_once = true");
+      } else {
+        RCLCPP_WARN(this->get_logger(), "Invalid cone index or max_z too low.");
+      }
+    }
 
 
-    // // Step 6: Publish centroids of top 2 closest clusters
-    // geometry_msgs::msg::PoseArray pose_array;
-    // pose_array.header = cloud_msg->header;
-
-    // for (const auto& [idx, score, dist] : scored_clusters) {
-    //   Eigen::Vector4f centroid;
-    //   pcl::compute3DCentroid(*clusters[idx], centroid);
-
-    //   geometry_msgs::msg::Pose pose;
-    //   pose.position.x = centroid[1];
-    //   pose.position.y = centroid[0];
-    //   pose.position.z = centroid[2];
-    //   pose.orientation.w = 1.0;  // No rotation
-
-    //   pose_array.poses.push_back(pose);
-    // }
-
-    // pose_pub_->publish(pose_array);
 
   }
-
-  // // Remove ground and high points by keeping z in [min_z, max_z] (step2)
-  // pcl::PointCloud<pcl::PointXYZI>::Ptr removeGround(pcl::PointCloud<pcl::PointXYZI>::Ptr cloud, float min_z, float max_z) {
-  //   pcl::PointCloud<pcl::PointXYZI>::Ptr no_ground(new pcl::PointCloud<pcl::PointXYZI>());
-
-  //   for (const auto& point : cloud->points) {
-  //     if (!std::isfinite(point.x) || !std::isfinite(point.y) || !std::isfinite(point.z)) {
-  //       continue;
-  //     }
-
-  //     if (point.z >= min_z && point.z <= max_z) {
-  //       no_ground->points.push_back(point);
-  //     }
-  //   }
-
-  //   no_ground->width = no_ground->points.size();
-  //   no_ground->height = 1;
-  //   no_ground->is_dense = true;
-
-  //   return no_ground;
-  // }
 
   // Remove ground and high points AND keep only right-side points (y < 0)
   pcl::PointCloud<pcl::PointXYZI>::Ptr removeGround(pcl::PointCloud<pcl::PointXYZI>::Ptr cloud, float min_z, float max_z) {
@@ -251,9 +189,6 @@ private:
 
     return no_ground;
   }
-
-
-
 
   // function for clustering (step3)
   std::vector<pcl::PointCloud<pcl::PointXYZI>::Ptr> performClustering(
@@ -295,8 +230,8 @@ private:
 
 
   // function to choose the cone cluster step4
-  std::vector<std::pair<int, float>> getTop5ConeCandidates(const std::vector<pcl::PointCloud<pcl::PointXYZI>::Ptr>& clusters) {
-    std::vector<std::pair<int, float>> scores;
+  std::vector<std::tuple<int, float, float>> getTop5ConeCandidates(const std::vector<pcl::PointCloud<pcl::PointXYZI>::Ptr>& clusters) {
+    std::vector<std::tuple<int, float, float>> scores;
 
     for (size_t i = 0; i < clusters.size(); ++i) {
       auto cluster = clusters[i];
@@ -335,22 +270,34 @@ private:
       //   0.2f * width_score +
       //   0.2f * depth_score;
 
+      // Cone info
+      // Cluster 1 | Intensity=126 | height=0.141182, width=0.154305, depth=0.11731
+      // → Scores: intensity=0.749762, height=0.121829, width=0.862906, depth=0.98513
+
       float total_score = intensity_score;
 
-      if (total_score > 0.8f) {
+      if (max_pt.z > 0.1f) {
         std::cout << "\033[1;31m[DETECTED] Cone detected! Score = " << total_score << "\033[0m" << std::endl;
+        // Debug print for each score
+        std::cout << "Cluster " << i
+                  << " | Intensity=" << avg_intensity
+                  << " | height=" << height << ", width=" << width << ", depth=" << depth << std::endl;
+
+        std::cout <<  ", max Z =" << max_pt.z << std::endl;
       }
 
-      scores.emplace_back(i, total_score);
+      scores.emplace_back(i, total_score, max_pt.z);
     }
 
     // Sort by score descending
-    std::sort(scores.begin(), scores.end(), [](auto& a, auto& b) {
-      return a.second > b.second;
+    std::sort(scores.begin(), scores.end(), [](const auto& a, const auto& b) {
+      return std::get<1>(a) > std::get<1>(b);  // compare scores
     });
 
     if (scores.size() > 5) scores.resize(5);
     return scores;
+
+
   }
 
   rclcpp::Publisher<geometry_msgs::msg::PoseArray>::SharedPtr pose_pub_;
